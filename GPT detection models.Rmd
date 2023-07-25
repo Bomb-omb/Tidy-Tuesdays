@@ -1,0 +1,146 @@
+---
+title: "GPT detection models"
+date: 2023-07-25
+output: html_document
+---
+
+# Overview
+
+In this study the authors evaluated the performance of various AI GPT detectors by passing written essays by native and non-native English writers to different **GPT detection models**. The authors argue that **GPT detection models** disproportionately classify real writing from non-native English writers as AI generated.
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2023-07-18")
+
+```
+
+# Readme
+
+The detectors dataset is from an R package named detectors, to install the package:
+
+```{r}
+require(pak)
+pak::pak("simonpcouch/detectors")
+```
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+# Glimpse Data
+
+The data is composed of 9 variables containing the type of detectors used to generate the predictions (**detector**) and the prediction whether is AI producing the text or not (**.pred_class**). A variable with the specification of the type of model used to generate the essay is also included (**model**).
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+Store in detector variable and change (**kind**) and (**.pred_class**) column to factors.
+
+```{r}
+detectors <- tt$detectors
+dtrs <- detectors %>%
+  mutate_at(c('kind','.pred_class'),as.factor)
+
+
+```
+
+Exploration
+
+```{r}
+
+dtrs %>%
+  count(native, kind, .pred_class)
+
+# Native speakers are more likely to be detected as human while non-native are more like to be misclassified.
+dtrs %>%
+  filter(!is.na(native)) %>%
+  mutate(native = case_when(native == "Yes" ~ "Native English Writer",
+                            native == "No" ~ "Non-Native English Writer")) %>%
+  ggplot(aes(.pred_AI, fill = native)) +
+  geom_histogram(show.legend = FALSE) +
+  facet_wrap(vars(native), scales = "free_y", ncol = 1)
+
+```
+
+```{r}
+library(yardstick)
+dtrs %>%
+  conf_mat(kind, .pred_class)
+
+```
+```{r}
+dtrs %>%
+  accuracy(kind, .pred_class)
+```
+
+
+```{r}
+dtrs %>%
+  group_by(detector) %>%
+  accuracy(kind, .pred_class)
+```
+
+
+```{r}
+dtrs %>%
+  group_by(native) %>%
+  accuracy(kind, .pred_class)
+```
+
+
+```{r}
+dtrs %>%
+  group_by(detector) %>%
+  sensitivity(kind, .pred_class)
+```
+
+
+```{r}
+dtrs %>%
+  filter(!is.na(native)) %>%
+  conf_mat(kind, .pred_class)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+dtrs %>%
+  group_by(detector) %>%
+  roc_curve(kind, .pred_AI) %>%
+  autoplot()
+  
+```
+```{r}
+
+dtrs %>%
+  group_by(detector) %>%
+  roc_curve(kind, .pred_AI)
+
+```
+```{r}
+dtrs %>%
+  group_by(native) %>%
+  mn_log_loss(kind, .pred_AI)
+```
+
